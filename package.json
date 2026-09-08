@@ -1,0 +1,15 @@
+{
+  "name": "household-expense",
+  "version": "1.0.0",
+  "private": true,
+  "description": "บันทึกรายจ่ายครัวเรือนผ่านกลุ่ม LINE ด้วย Google Sheets เป็นฐานข้อมูลหลัก",
+  "scripts": {
+    "test": "node tests/run.js && node --experimental-strip-types --no-warnings tests/worker/signature.test.mjs",
+    "test:apps-script": "node tests/run.js",
+    "test:worker": "node --experimental-strip-types --no-warnings tests/worker/signature.test.mjs",
+    "typecheck": "cd worker && npx tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=22.6"
+  }
+}

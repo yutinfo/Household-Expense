@@ -1,0 +1,18 @@
+{
+  "name": "household-expense-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "LINE webhook gateway for the household expense bot",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "node ../tests/run.js worker"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250109.0",
+    "typescript": "^5.7.2",
+    "wrangler": "^3.99.0"
+  }
+}
