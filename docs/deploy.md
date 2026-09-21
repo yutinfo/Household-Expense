@@ -67,7 +67,22 @@ flowchart TD
    AttachmentService  OcrService  OcrSchema  SlipParser  DuplicateDetection
    ```
 
-> **ทางลัดสำหรับคนใช้ command line:** ติดตั้ง `npm i -g @google/clasp` → `clasp login` → คัดลอก `.clasp.json.example` เป็น `.clasp.json` ใส่ `scriptId` แล้ว `clasp push` จะอัปโหลดทั้งโฟลเดอร์ให้อัตโนมัติ
+> **ทางลัดที่แนะนำ (clasp v3) — ไม่ต้อง copy-paste ทีละไฟล์เลย**
+>
+> ```bash
+> npm i -g @google/clasp
+> clasp login
+> # เปิดสวิตช์ Google Apps Script API ที่ https://script.google.com/home/usersettings ก่อน
+> clasp create-script --title "Household Expense Backend" --rootDir apps-script
+> git checkout apps-script/appsscript.json   # ⚠️ ดูคำเตือนข้างล่าง
+> clasp push
+> ```
+>
+> ⚠️ **`clasp create-script` และ `clasp pull` จะเขียนทับ `apps-script/appsscript.json`**
+> ด้วยค่า default ของ Google (timeZone กลายเป็น `America/New_York`, บล็อก `webapp` และ
+> `oauthScopes` หายทั้งหมด) ซึ่งจะทำให้ Worker ยิงเข้า Web App ไม่ได้
+> ให้ `git checkout apps-script/appsscript.json` กู้คืนทุกครั้งก่อน `clasp push`
+> และหลังจากนี้ **ใช้ `clasp push` ทางเดียวพอ**
 
 ---
 
@@ -105,14 +120,47 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ## ขั้นที่ 5 — สร้าง LINE Official Account
 
-1. เปิด https://developers.line.biz/console/ → login ด้วย LINE
-2. **Create a new provider** → ตั้งชื่อ เช่น `Family`
-3. ในโปรไวเดอร์นั้น → **Create a Messaging API channel** → กรอกชื่อบอท เช่น `บัญชีบ้านเรา`
-4. ไปแท็บ **Messaging API**:
-   - **Channel access token (long-lived)** → กด Issue → คัดลอกเก็บไว้
-   - **Allow bot to join group chats** → เปิด (ที่ LINE Official Account Manager → Settings → Response settings)
-   - **Auto-reply messages / Greeting messages** → **ปิด** (ไม่งั้นจะตอบซ้ำกับบอทเรา)
-5. ไปแท็บ **Basic settings** → คัดลอก **Channel secret**
+> LINE เปลี่ยนลำดับแล้ว: **สร้าง OA ก่อน แล้วค่อยเปิด Messaging API** — สร้าง channel ตรง ๆ จาก
+> Developers Console ไม่ได้อีกต่อไป
+
+### 5.1 สร้างบัญชี OA
+
+1. เปิด https://entry.line.biz/ → login ด้วย LINE (หรือสมัคร LINE Business ID)
+2. กรอกฟอร์มสร้างบัญชี ตั้งชื่อบอท เช่น `บัญชีบ้านเรา` → ประเภทเลือกอะไรก็ได้ (ใช้ในครอบครัว)
+3. เช็คว่าบัญชีโผล่ใน https://manager.line.biz แล้ว
+
+### 5.2 เปิด Messaging API (ขั้นนี้แหละที่สร้าง channel ให้)
+
+1. ที่ https://manager.line.biz → เลือกบัญชี → **ตั้งค่า (Settings)** → **Messaging API**
+2. กด **ใช้งาน Messaging API (Enable Messaging API)**
+3. เลือก Provider เดิม หรือสร้างใหม่ เช่น `Family`
+
+   ⚠️ **Provider เปลี่ยนทีหลังไม่ได้** เลือกแล้วเลือกเลย
+4. ลิงก์ Privacy Policy / Terms — เว้นว่างได้ → **OK**
+
+### 5.3 ปิดระบบตอบอัตโนมัติของ LINE (สำคัญ ไม่งั้นตอบซ้ำกับบอทเรา)
+
+ที่ manager.line.biz → **ตั้งค่า → การตอบกลับ (Response settings)**:
+
+| ตั้งค่า | ค่าที่ต้องการ |
+| --- | --- |
+| ข้อความต้อนรับ (Greeting messages) | **ปิด** |
+| ตอบกลับอัตโนมัติ (Auto-reply messages) | **ปิด** |
+| Webhook | **เปิด** |
+
+### 5.4 อนุญาตให้บอทเข้ากลุ่ม
+
+manager.line.biz → **ตั้งค่า → การตั้งค่าบัญชี (Account settings)** → หมวด **Toggle features**
+→ เปิด **อนุญาตให้บัญชีเข้าร่วมกลุ่มและแชทหลายคน**
+
+> ถ้าไม่เปิด บอทจะถูกเชิญเข้ากลุ่มไม่ได้เลย
+
+### 5.5 เก็บ secret และ token
+
+ไปที่ https://developers.line.biz/console/ → เลือก provider → เลือก channel ที่เพิ่งถูกสร้าง:
+
+- แท็บ **Basic settings** → คัดลอก **Channel secret**
+- แท็บ **Messaging API** → **Channel access token (long-lived)** → กด **Issue** → คัดลอกเก็บไว้
 
 เพิ่มลง Script Properties:
 
@@ -195,9 +243,23 @@ curl https://household-expense-gateway.<ชื่อคุณ>.workers.dev/healt
 
 1. สร้างกลุ่ม LINE ใหม่ที่มีคุณ + ภรรยา
 2. เชิญบอท (ค้นหา LINE ID ของ OA ได้จาก LINE Official Account Manager)
-3. **หา Group ID:** ส่งข้อความอะไรก็ได้ในกลุ่ม แล้วดูใน Apps Script → **Executions** → เปิด log ล่าสุด
-   จะเห็นบรรทัด `envelope rejected` หรือ error พร้อม groupId — หรือดูง่ายกว่านั้น:
-   เปิดแท็บ `Inbox` ในชีต จะมีแถวใหม่ ในคอลัมน์ `payload_json` มี `"groupId":"Cxxxxx..."`
+3. **หา Group ID:** เปิดอีกเทอร์มินัลค้างไว้
+
+   ```bash
+   cd worker && npx wrangler tail
+   ```
+
+   แล้วส่งข้อความอะไรก็ได้ในกลุ่ม จะเห็นบรรทัด:
+
+   ```
+   ignored: events outside the allowed group — saw Cxxxxxxxxxxxxxxxxx
+   ```
+
+   `Cxxxx...` นั่นแหละคือ Group ID
+
+   > ⚠️ **อย่าไปหาในแท็บ `Inbox`** — Worker กรองกลุ่มที่ไม่รู้จักทิ้งตั้งแต่ก่อนส่งต่อ
+   > ให้ Apps Script ([`index.ts` ขั้นที่ 3](../worker/src/index.ts)) ตอนที่ `ALLOWED_GROUP_ID`
+   > ยังไม่ถูกตั้ง ข้อความจึงไม่มีวันไปถึงชีต `Inbox` จะว่างเสมอ
 4. เอา Group ID ไปใส่ทั้ง 2 ที่:
    - Script Properties: `ALLOWED_GROUP_ID`
    - `worker/wrangler.toml` → `ALLOWED_GROUP_ID` แล้ว `npx wrangler deploy` อีกครั้ง

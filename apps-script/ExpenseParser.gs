@@ -9,6 +9,7 @@
 var PLAN_WORDS = ['ว่าจะ', 'อยากซื้อ', 'กะว่า', 'คิดจะ', 'จะซื้อ', 'เดี๋ยวซื้อ', 'พรุ่งนี้จะ', 'วางแผน', 'น่าจะซื้อ', 'อยากได้', 'ถ้าซื้อ', 'planning', 'จะจ่าย'];
 var QUESTION_WORDS = ['เท่าไหร่', 'เท่าไร', 'กี่บาท', 'เหลือเท่า', 'ใครจ่าย', '?', 'ไหม', 'มั้ย', 'หรือเปล่า', 'สรุป'];
 var REFUND_WORDS = ['ได้เงินคืน', 'เงินคืน', 'คืนเงิน', 'คืนของ', 'refund', 'รีฟันด์', 'ยกเลิกออเดอร์ได้เงิน'];
+var INCOME_WORDS = ['เงินเดือน', 'โบนัส', 'รายรับ', 'เงินเข้า', 'ได้รับเงิน', 'ขายของได้', 'ค่าจ้าง', 'ดอกเบี้ย'];
 var TRANSFER_WORDS = ['โอนให้', 'โอนเข้า', 'โอนไป', 'ยืมเงิน', 'คืนหนี้ให้', 'transfer', 'โอนกลับ'];
 var PAYER_MARKERS = ['จ่าย', 'ออกให้', 'ออกเงิน', 'เป็นคนจ่าย', 'จ่ายเอง'];
 
@@ -269,6 +270,11 @@ function parseMessage(rawText, ctx) {
   var transferInfo = parseFindTransferTarget_(text);
   var refundWord = null;
   for (var i = 0; i < REFUND_WORDS.length; i++) if (text.indexOf(REFUND_WORDS[i]) >= 0) { refundWord = REFUND_WORDS[i]; break; }
+  // Refund wins: "ได้เงินคืน" contains money-in wording but is a negative expense.
+  var incomeWord = null;
+  if (!refundWord) {
+    for (var n = 0; n < INCOME_WORDS.length; n++) if (text.indexOf(INCOME_WORDS[n]) >= 0) { incomeWord = INCOME_WORDS[n]; break; }
+  }
 
   // Blank out date/payer spans so they never leak into a description.
   function blankOut(s, spans) {
@@ -279,6 +285,31 @@ function parseMessage(rawText, ctx) {
     return chars.join('');
   }
   working = blankOut(working, offsets);
+
+  // ---- income ---------------------------------------------------------------
+  // Money coming in. Carries no category, so it never lands in a spending
+  // total, a category breakdown, or a budget.
+  if (incomeWord && !transferInfo) {
+    if (amounts.length !== 1) {
+      return { kind: 'clarify', code: 'INCOME_MULTI_AMOUNT', question: 'รายรับมีหลายจำนวนเงินในข้อความเดียว แยกพิมพ์ทีละรายการครับ', data: { text: rawText } };
+    }
+    var inDesc = parseCleanDescription_(working.replace(/\d[\d,]*(\.\d{1,2})?/g, ' '));
+    return {
+      kind: 'items',
+      items: [{
+        type: 'income',
+        amount_satang: amounts[0].satang,
+        description: inDesc || incomeWord,
+        category_id: '',
+        category_source: 'income',
+        occurred_date: occurredDate,
+        payer_member_id: payerMemberId,
+        recorder_member_id: ctx.recorderMemberId,
+        original_text: rawText
+      }],
+      unknownCategoryIndexes: []
+    };
+  }
 
   // ---- transfer -------------------------------------------------------------
   if (transferInfo && !refundWord) {

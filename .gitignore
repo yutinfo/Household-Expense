@@ -4,3 +4,4 @@ node_modules/
 *.log
 .wrangler/
 dist/
+apps-script/Local.gs

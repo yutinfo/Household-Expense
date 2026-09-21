@@ -8,9 +8,10 @@ function reportRangeTotals(fromISO, toISO) {
   var rows = txInDateRange(txActiveCommitted(), fromISO, toISO);
   var byCategory = {};
   var byPayer = {};
-  var expense = 0, refund = 0, transfer = 0, count = 0;
+  var expense = 0, refund = 0, transfer = 0, income = 0, count = 0;
   rows.forEach(function (r) {
     if (r.type === 'transfer') { transfer += Number(r.amount_satang); return; }
+    if (r.type === 'income') { income += Number(r.amount_satang); return; }
     count++;
     var sign = r.type === 'refund' ? -1 : 1;
     if (r.type === 'expense') expense += Number(r.amount_satang); else refund += Number(r.amount_satang);
@@ -20,7 +21,7 @@ function reportRangeTotals(fromISO, toISO) {
   return {
     from: fromISO, to: toISO,
     net: expense - refund,
-    expense: expense, refund: refund, transfer: transfer,
+    expense: expense, refund: refund, transfer: transfer, income: income,
     count: count,
     byCategory: byCategory,
     byPayer: byPayer,
@@ -51,8 +52,12 @@ function reportTextForRange(title, fromISO, toISO) {
     lines.push('ยังไม่มีรายการที่บันทึกในช่วงนี้ครับ');
     return lines.join('\n');
   }
+  // Income lines only appear in periods that actually had income, so a household
+  // that only tracks spending sees exactly the report it saw before.
+  if (t.income > 0) lines.push('รายรับ ' + moneyFormatBaht(t.income));
   lines.push('รายจ่ายสุทธิ ' + moneyFormatBaht(t.net) + ' จาก ' + t.count + ' รายการที่บันทึก');
   if (t.refund > 0) lines.push('(รายจ่าย ' + moneyFormatBaht(t.expense) + ' หักเงินคืน ' + moneyFormatBaht(t.refund) + ')');
+  if (t.income > 0) lines.push('คงเหลือ ' + moneyFormatBaht(t.income - t.net));
   reportCategorySorted(t.byCategory).forEach(function (c) {
     lines.push('• ' + c.name + ' ' + moneyFormatBaht(c.amount));
   });

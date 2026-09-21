@@ -138,11 +138,11 @@ function routerEnrichWithAi_(parsed, text, ctx, today) {
   }
   var unknown = [];
   parsed.items.forEach(function (item, i) {
-    if (item.type !== 'transfer' && !item.category_id && ai.items[i].category_id) {
+    if (txNeedsCategory(item.type) && !item.category_id && ai.items[i].category_id) {
       item.category_id = ai.items[i].category_id;
       item.category_source = 'ai';
     }
-    if (item.type !== 'transfer' && !item.category_id) unknown.push(i);
+    if (txNeedsCategory(item.type) && !item.category_id) unknown.push(i);
   });
   parsed.unknownCategoryIndexes = unknown;
   return parsed;
@@ -152,7 +152,7 @@ function routerEnrichWithAi_(parsed, text, ctx, today) {
 function routerCommitOrAsk_(items, ctx) {
   var missing = -1;
   for (var i = 0; i < items.length; i++) {
-    if (items[i].type !== 'transfer' && !items[i].category_id) { missing = i; break; }
+    if (txNeedsCategory(items[i].type) && !items[i].category_id) { missing = i; break; }
   }
   if (missing >= 0) {
     var pa = pendingCreate(PENDING_TYPES.CHOOSE_CATEGORY, ctx.userId, ctx.groupId, { items: items, index: missing }, { eventId: ctx.eventId });

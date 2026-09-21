@@ -59,6 +59,9 @@ function doPost(e) {
       }
     });
 
+    // One place to hang the standing command menu off every reply we send.
+    replies.forEach(function (r) { r.messages = msgAttachMenu(r.messages); });
+
     return webhookJson_({ ok: true, replies: replies, accepted: accepted.length, deferred: deferred });
   } catch (fatal) {
     Logger.log('doPost fatal: ' + configRedact(String(fatal && fatal.stack ? fatal.stack : fatal)));

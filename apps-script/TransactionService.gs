@@ -9,8 +9,17 @@
  *  - every mutation writes an AuditLog row and bumps `revision`
  */
 
-var TX_TYPES = ['expense', 'refund', 'transfer'];
+var TX_TYPES = ['expense', 'refund', 'transfer', 'income'];
 var TX_STATUS = { ACTIVE: 'active', VOID: 'void' };
+
+/**
+ * Transfers and income sit outside the spending categories, so they are never
+ * asked about, never land in a category total, and never touch a budget.
+ * Single source of truth — the router and the validator both read it.
+ */
+function txNeedsCategory(type) {
+  return type !== 'transfer' && type !== 'income';
+}
 
 function txAll() { return repoReadAll('Transactions').rows; }
 
@@ -31,7 +40,7 @@ function txValidateDraft_(draft) {
   moneyAssertInt(draft.amount_satang, 'amount');
   if (draft.amount_satang <= 0) throw new Error('TX_ZERO_AMOUNT');
   if (!timeIsValidDateISO(draft.occurred_date)) throw new Error('TX_BAD_DATE:' + draft.occurred_date);
-  if (draft.type !== 'transfer') {
+  if (txNeedsCategory(draft.type)) {
     if (!draft.category_id) throw new Error('TX_NO_CATEGORY');
     if (!categoryById(draft.category_id)) throw new Error('TX_UNKNOWN_CATEGORY:' + draft.category_id);
   }

@@ -12,6 +12,63 @@ function msgText(text, quickReplyItems) {
   return m;
 }
 
+/** Quick-reply item that sends `text` exactly as if the user had typed it. */
+function msgMessageItem(label, text) {
+  return {
+    type: 'action',
+    action: { type: 'message', label: String(label).slice(0, 20), text: String(text).slice(0, 300) }
+  };
+}
+
+/**
+ * The standing command menu. Message actions, so a tap flows through the same
+ * text pipeline as typing — the router needs to know nothing about them.
+ */
+var MENU_COMMANDS = [
+  ['วันนี้', 'วันนี้'],
+  ['เดือนนี้', 'เดือนนี้'],
+  ['รายการล่าสุด', 'รายการล่าสุด'],
+  ['ใครจ่ายเท่าไหร่', 'เดือนนี้ใครจ่ายเท่าไหร่'],
+  ['เทียบเดือนก่อน', 'เทียบเดือนก่อน'],
+  ['ช่วยเหลือ', 'ช่วยเหลือ']
+];
+
+var QUICK_REPLY_MAX = 13;
+
+function msgMenuItems() {
+  return MENU_COMMANDS.map(function (c) { return msgMessageItem(c[0], c[1]); });
+}
+
+/** True when a message is waiting on a decision, i.e. its buttons carry a
+ *  pending action id. Offering the menu there invites tapping away mid-answer. */
+function msgIsAwaitingDecision_(msg) {
+  var items = (msg && msg.quickReply && msg.quickReply.items) || [];
+  for (var i = 0; i < items.length; i++) {
+    var data = items[i].action && items[i].action.data;
+    if (data && /(^|&)p=/.test(String(data))) return true;
+  }
+  return false;
+}
+
+/**
+ * Appends the command menu to the last message of a reply, so there is almost
+ * always something to tap. Skipped while a decision is pending, or when the
+ * buttons would exceed what LINE renders.
+ */
+function msgAttachMenu(messages) {
+  if (!messages || !messages.length) return messages || [];
+  var last = messages[messages.length - 1];
+  if (!last || last.type !== 'text') return messages;
+  if (msgIsAwaitingDecision_(last)) return messages;
+
+  var existing = (last.quickReply && last.quickReply.items) || [];
+  var menu = msgMenuItems();
+  if (existing.length + menu.length > QUICK_REPLY_MAX) return messages;
+
+  last.quickReply = { items: existing.concat(menu) };
+  return messages;
+}
+
 function msgPostbackItem(label, data, displayText) {
   return {
     type: 'action',
@@ -44,7 +101,10 @@ function msgParsePostbackData(data) {
 }
 
 function msgTypeLabel(type) {
-  return type === 'refund' ? 'เงินคืน' : (type === 'transfer' ? 'โอนภายใน' : 'รายจ่าย');
+  if (type === 'refund') return 'เงินคืน';
+  if (type === 'transfer') return 'โอนภายใน';
+  if (type === 'income') return 'รายรับ';
+  return 'รายจ่าย';
 }
 
 /** One transaction line: "T7K2QA อาหาร 200 บาท (ยุทธจ่าย) 8 ก.ย. 2026" */
@@ -54,7 +114,7 @@ function msgTxLine(tx) {
   if (tx.description) parts.push(tx.description);
   parts.push(moneyFormatBaht(tx.amount_satang));
   if (tx.type !== 'transfer') parts.push('[' + categoryName(tx.category_id) + ']');
-  parts.push('จ่ายโดย ' + memberName(tx.payer_member_id));
+  parts.push((tx.type === 'income' ? 'รับโดย ' : 'จ่ายโดย ') + memberName(tx.payer_member_id));
   parts.push(timeThaiDateLabel(tx.occurred_date));
   return parts.join(' · ');
 }

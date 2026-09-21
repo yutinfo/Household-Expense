@@ -107,8 +107,10 @@ function setupFormatSheet_(sh, name, headers) {
     if (name === 'Transactions') {
       var typeIdx = headers.indexOf('type') + 1;
       var statusIdx = headers.indexOf('status') + 1;
-      var typeRule = SpreadsheetApp.newDataValidation().requireValueInList(['expense', 'refund', 'transfer'], true).setAllowInvalid(false).build();
-      var statusRule = SpreadsheetApp.newDataValidation().requireValueInList(['active', 'void'], true).setAllowInvalid(false).build();
+      // Read the allowed values from the code that defines them. A second
+      // hand-written list here is how 'income' got locked out of its own sheet.
+      var typeRule = SpreadsheetApp.newDataValidation().requireValueInList(TX_TYPES, true).setAllowInvalid(false).build();
+      var statusRule = SpreadsheetApp.newDataValidation().requireValueInList([TX_STATUS.ACTIVE, TX_STATUS.VOID], true).setAllowInvalid(false).build();
       sh.getRange(2, typeIdx, Math.max(sh.getMaxRows() - 1, 1), 1).setDataValidation(typeRule);
       sh.getRange(2, statusIdx, Math.max(sh.getMaxRows() - 1, 1), 1).setDataValidation(statusRule);
     }
@@ -174,6 +176,11 @@ function setupProtections_() {
  * aliases: comma-separated nicknames used in messages, e.g. "เมีย,ภรรยา,แฟน".
  */
 function setupAddMember(memberId, lineUserId, displayName, aliases) {
+  // The editor's Run button calls a function with no arguments at all, which
+  // used to append a blank row that memberList() then counted as a real member.
+  if (!String(memberId || '').trim() || !String(displayName || '').trim()) {
+    throw new Error('SETUP_ADD_MEMBER_NEEDS_ARGS: ต้องระบุ memberId และ displayName — เรียกผ่านฟังก์ชันใน Local.gs ไม่ใช่กดเรียกใช้ตัวนี้ตรง ๆ');
+  }
   if (repoFindOne('Members', 'member_id', memberId)) {
     repoUpdateWhere('Members', 'member_id', memberId, { line_user_id: lineUserId || '', display_name: displayName, aliases: aliases || '', active: 'true' });
   } else {
